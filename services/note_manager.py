@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 
 from services.google_docs_manager import GoogleDocsManager
 from services.obsidian_manager import ObsidianManager
+from services.feishu_docs_manager import FeishuDocsManager
 
 
 class InsertionDecision(BaseModel):
@@ -52,6 +53,10 @@ class NoteManager:
             gdocs_config = config.get('google_docs', {})
             self.backend_manager = GoogleDocsManager(gdocs_config)
             self.note_files_config = gdocs_config.get('note_files', [])
+        elif self.note_backend_name == 'feishu_docs':
+            feishu_config = config.get('feishu_docs', {})
+            self.backend_manager = FeishuDocsManager(feishu_config)
+            self.note_files_config = feishu_config.get('note_files', [])
         else:
             raise ValueError(f"不支持的笔记后端: {self.note_backend_name}")
 
@@ -105,7 +110,8 @@ class NoteManager:
                 return
 
             # --- 步骤 3: 获取文档结构 ---
-            doc_id_or_path = target_doc_config.get('document_id') if self.note_backend_name == 'google_docs' else self.backend_manager.get_full_path(target_doc_config)
+            document_backends = {'google_docs', 'feishu_docs'}
+            doc_id_or_path = target_doc_config.get('document_id') if self.note_backend_name in document_backends else self.backend_manager.get_full_path(target_doc_config)
             
             doc_structure = await self.backend_manager.get_document_structure(doc_id_or_path)
             if not doc_structure:
@@ -303,7 +309,7 @@ class NoteManager:
         doc_end_pos_raw = doc_structure['end_of_document']
 
         # 针对不同后端调整在文档末尾插入的位置
-        if self.note_backend_name == 'google_docs':
+        if self.note_backend_name in {'google_docs', 'feishu_docs'}:
             # Google Docs API要求插入点必须严格小于段落的endIndex
             doc_end_pos = max(1, doc_end_pos_raw - 1)
         else:
@@ -370,7 +376,7 @@ class NoteManager:
         target_level = target_heading['level']
         
         # 确定文档末尾的正确位置
-        if self.note_backend_name == 'google_docs':
+        if self.note_backend_name in {'google_docs', 'feishu_docs'}:
             doc_end_pos = max(1, doc_structure['end_of_document'] - 1)
         else:
             doc_end_pos = doc_structure['end_of_document']
@@ -426,7 +432,7 @@ class NoteManager:
         # 2. 根据后端类型，应用不同的解析和搜索策略
         if self.note_backend_name == 'obsidian':
             return self._search_in_obsidian_content(content, query, group_filter)
-        elif self.note_backend_name == 'google_docs':
+        elif self.note_backend_name in {'google_docs', 'feishu_docs'}:
             return self._search_in_gdocs_content(content, query, group_filter)
         
         return []

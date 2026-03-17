@@ -7,7 +7,6 @@ DailyBot - 微信信息整理AI助手
 
 import os
 import sys
-import json
 import signal
 import asyncio
 import logging
@@ -18,7 +17,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from channel.channel_factory import ChannelFactory
-from channel.channel import ReplyType, Context, Reply
+from channel.channel import Context, Reply
 from bot.message_handler import MessageHandler
 from services.llm_service import LLMService
 from services.note_manager import NoteManager
@@ -95,6 +94,23 @@ class DailyBot:
                 if not google_config.get('credentials_file') or not os.path.exists(google_config.get('credentials_file', '')):
                     logger.error("请配置有效的 Google 服务账号凭证文件")
                     sys.exit(1)
+
+            elif note_backend == 'feishu_docs':
+                # 检查Feishu Docs配置
+                feishu_config = self.config.get('feishu_docs', {})
+                note_files = feishu_config.get('note_files', [])
+                if not note_files:
+                    logger.error("使用Feishu Docs后端时，请在config.json的'feishu_docs'中配置'note_files'")
+                    sys.exit(1)
+
+                for doc in note_files:
+                    if not doc.get('document_id'):
+                        logger.error(f"Feishu Docs中的笔记 '{doc.get('name', '未命名')}' 未配置有效的 document_id")
+                        sys.exit(1)
+
+                if not feishu_config.get('app_id') or not feishu_config.get('app_secret'):
+                    logger.error("请配置有效的 Feishu app_id 和 app_secret（建议通过环境变量注入）")
+                    sys.exit(1)
             
         except Exception as e:
             logger.error(f"配置文件加载失败: {e}")
@@ -120,8 +136,8 @@ class DailyBot:
                 if 'rag' not in self.config:
                     logger.error("配置文件中缺少 'rag' 配置项。")
                     sys.exit(1)
-                if self.config.get('note_backend') == 'google_docs':
-                    logger.warning("Google Docs后端暂不支持RAG功能。")
+                if self.config.get('note_backend') in {'google_docs', 'feishu_docs'}:
+                    logger.warning("云文档后端（Google Docs/Feishu Docs）暂不支持RAG功能。")
                     self.rag_service = None
                 else:
                     self.rag_service = RAGService(
@@ -240,6 +256,17 @@ class DailyBot:
         try:
             # 步骤 1: 启动并初始化通道服务
             self.channel.startup()
+
+            # 启动后健康检查：
+            # - 部分通道（如 wcf）在“环境不满足”时会直接 return 而不是抛异常；
+            # - 若不做检查，主循环会继续运行，用户只能看到“程序挂着但不收消息”。
+            # 这里基于通道公开的 running 标记进行一次保守校验，便于尽早失败并给出明确提示。
+            if getattr(self.channel, 'running', True) is False:
+                channel_type = self.config.get('channel_type', 'unknown')
+                raise RuntimeError(
+                    f"{channel_type} 通道启动未成功（running=False）。"
+                    "请先按日志完成依赖/环境排查后重试。"
+                )
             
             # 步骤 2: (同步)处理已在白名单的群组的历史消息
             await self.message_handler.check_and_process_history_on_startup()

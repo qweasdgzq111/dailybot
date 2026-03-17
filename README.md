@@ -11,7 +11,7 @@
 - 提取链接前后1分钟内的对话上下文（通过消息持久化存储实现）
 - 采用 [Jina AI Reader](https://github.com/jina-ai/reader) 作为核心解析引擎，通过 `https://r.jina.ai/` API，能够稳定、高效地提取任何URL（包括微信公众号、B站、Arxiv及普通网页）的核心内容，并将其转换为对LLM友好的Markdown格式。
 - 使用LLM对内容进行智能总结（1-5句话精炼总结）
-- 自动分类并保存到笔记系统（支持Obsidian和Google Docs）
+- 自动分类并保存到笔记系统（支持Obsidian、Google Docs和飞书Docs）
 - 智能去重，避免重复内容
 
 ### 2. 智能问答（非静默模式）
@@ -39,7 +39,7 @@
 - 使用OpenAI API进行内容理解和生成
 - 消息持久化存储（SQLite），确保完整的上下文获取
 - 支持Obsidian通过iCloud同步
-- 支持Google Docs云端存储
+- 支持Google Docs/飞书Docs云端存储
 - 可部署在云服务器上
 
 ## 笔记格式示例
@@ -142,6 +142,15 @@ cd dailybot
 pip install -r requirements.txt
 ```
 
+> Windows PowerShell 常见问题：如果你看到 `\.venv\Scripts\Activate.ps1` 找不到，请先在项目根目录创建虚拟环境。
+> ```powershell
+> python -m venv .venv
+> Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+> .\.venv\Scripts\Activate.ps1
+> python -m pip install --upgrade pip
+> python -m pip install -r requirements.windows.txt
+> ```
+
 3. 选择并配置登录方案
 - **JS Wechaty**：参考 [微信登录方案说明](docs/wechat_login_methods.md#方案一javascript-wechaty)
 - **wcf**：参考 [微信登录方案说明](docs/wechat_login_methods.md#方案二wechat-ferry-wcf)
@@ -161,6 +170,10 @@ pip install -r requirements.txt
   
   # Jina AI Reader API Key (用于微信公众号等复杂页面提取)
   JINA_API_KEY=你的Jina_API密钥
+
+  # Feishu Docs配置（如果使用飞书后端）
+  FEISHU_APP_ID=你的飞书应用App ID
+  FEISHU_APP_SECRET=你的飞书应用App Secret
 
   # Mac微信通道（静默模式）配置
   WECHAT_DB_KEY=你的64位数据库密钥
@@ -227,7 +240,7 @@ python app.py
     "temperature": 0.7,                      // 生成温度
   },
   
-  "note_backend": "obsidian",  // 笔记后端：obsidian | google_docs
+  "note_backend": "obsidian",  // 笔记后端：obsidian | google_docs | feishu_docs
   
   "note_management": {
     "classification_strategy": "balanced" // 分类策略: diligent_categorizer (努力归档), cautious_filer (谨慎归档), balanced (均衡), aggressive (激进)
@@ -477,6 +490,11 @@ A:
 - **Mac静默模式**: 检查 `WECHAT_DB_KEY` 环境变量是否已在 `.env` 文件中正确设置且密钥有效。检查系统是否已安装 `sqlcipher` (`brew install sqlcipher`)。
 - **Mac Hook模式**: 确认你已经**手动成功安装并运行了 `WeChatTweak-macOS`**。检查本程序的日志，看是否有检测到Tweak已安装的提示。
 - **其他通道**: 检查对应的服务是否启动（如JS服务或wcf客户端）。
+- **Windows WCF 通道（出现 `无法打开注册表项` / `获取 WeChat 安装路径失败` / `打开微信失败`）**:
+  1. 确保安装的是微信 PC 桌面版（尽量避免 Microsoft Store 版本）。
+  2. 先手动打开并登录微信，再运行 `python app.py`。
+  3. 使用管理员权限启动 PyCharm 或 PowerShell 后重试。
+  4. 若系统未写入微信安装注册表，可手动设置环境变量 `WCF_WECHAT_EXE` 指向 `WeChat.exe` 的完整路径。
 - 查看日志文件 (`logs/`) 中的具体错误信息。
 - 确认 `config.json` 中的配置是否正确。
 
@@ -532,3 +550,23 @@ A:
 - [ ] 更多内容源支持
 - [ ] 多模态内容处理
 - [ ] 支持企业微信、飞书等更多通道
+
+
+### 飞书Docs后端配置补充
+
+当 `note_backend` 设为 `feishu_docs` 时，需要额外配置：
+
+```json
+"feishu_docs": {
+  "base_url": "https://open.feishu.cn/open-apis",
+  "note_files": [
+    {
+      "name": "DailyAI飞书知识库",
+      "document_id": "doxcnxxxxxxxxxxxxxxxxx",
+      "description": "人工智能相关内容"
+    }
+  ]
+}
+```
+
+同时请在环境变量中设置 `FEISHU_APP_ID` 与 `FEISHU_APP_SECRET`。

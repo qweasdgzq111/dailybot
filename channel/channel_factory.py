@@ -40,23 +40,23 @@ class ChannelFactory:
         channel_type = config.get('channel_type', 'js_wechaty')
         
         try:
-            channel_config = config.get(channel_type, {})
-            
             if channel_type == 'js_wechaty':
                 # 基于JavaScript wechaty的微信通道
-                return JSWechatyChannel(channel_config)
+                # 直接传入全量配置，避免各通道读取不到顶层配置项。
+                return JSWechatyChannel(config)
                 
             elif channel_type == 'wcf':
                 # 基于WeChat-Ferry的微信通道（仅Windows）
                 if WcfChannel is None:
                     raise ValueError(f"通道类型 'wcf' 仅在Windows上受支持，当前系统为 {sys.platform}。")
-                return WcfChannel(channel_config)
+                # 直接传入全量配置，保持与 app.py 注入流程一致。
+                return WcfChannel(config)
                 
             elif channel_type == 'mac_wechat':
                 # 基于数据库读取和Hook的Mac微信通道（仅macOS）
                 if MacWeChatChannel is None:
                     raise ValueError(f"通道类型 'mac_wechat' 仅在macOS上受支持，当前系统为 {sys.platform}。")
-                return MacWeChatChannel(channel_config)
+                return MacWeChatChannel(config)
                 
             # 可以在这里添加更多通道类型
             # elif channel_type == 'telegram':
