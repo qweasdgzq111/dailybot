@@ -73,6 +73,18 @@ class ConfigLoader:
             config['jina']['api_key'] = jina_key
             logger.info("已从环境变量加载 Jina API Key。")
 
+
+        # Feishu Docs配置
+        config.setdefault('feishu_docs', {})
+        feishu_app_id = os.getenv('FEISHU_APP_ID')
+        feishu_app_secret = os.getenv('FEISHU_APP_SECRET')
+        if feishu_app_id:
+            config['feishu_docs']['app_id'] = feishu_app_id
+            logger.info("已从环境变量加载 Feishu App ID。")
+        if feishu_app_secret:
+            config['feishu_docs']['app_secret'] = feishu_app_secret
+            logger.info("已从环境变量加载 Feishu App Secret。")
+
         # 代理配置
         config.setdefault('proxy', {})
         proxy_url = os.getenv('HTTPS_PROXY') or os.getenv('https_proxy')
@@ -107,6 +119,8 @@ class ConfigLoader:
             required_fields['obsidian'] = ['vault_path', 'note_files']
         elif note_backend == 'google_docs':
             required_fields['google_docs'] = ['credentials_file', 'note_files']
+        elif note_backend == 'feishu_docs':
+            required_fields['feishu_docs'] = ['app_id', 'app_secret', 'note_files']
 
         # 检查所有必需的字段
         for main_key, sub_keys in required_fields.items():
